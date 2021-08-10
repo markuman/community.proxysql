@@ -11,7 +11,7 @@ DOCUMENTATION = '''
 module: proxysql_manage_config
 
 author: "Ben Mildren (@bmildren)"
-short_description: Writes the proxysql configuration settings between layers.
+short_description: Writes the proxysql configuration settings between layers
 description:
    - The M(community.proxysql.proxysql_global_variables) module writes the proxysql configuration
      settings between layers. Currently this module will always report a
@@ -57,7 +57,8 @@ options:
     required: True
 extends_documentation_fragment:
 - community.proxysql.proxysql.connectivity
-
+notes:
+- Supports C(check_mode).
 '''
 
 EXAMPLES = '''
@@ -97,7 +98,7 @@ stdout:
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver, mysql_driver_fail_msg
+from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver
 from ansible.module_utils._text import to_native
 
 # ===========================================
@@ -133,9 +134,6 @@ def perform_checks(module):
             msg_string = ("The direction \"%s\" is not a valid combination" +
                           " with the CONFIG config_layer")
             module.fail_json(msg=msg_string % module.params["direction"])
-
-    if mysql_driver is None:
-        module.fail_json(msg=mysql_driver_fail_msg)
 
 
 def manage_config(manage_config_settings, cursor):
@@ -189,10 +187,10 @@ def main():
 
     cursor = None
     try:
-        cursor, db_conn = mysql_connect(module,
-                                        login_user,
-                                        login_password,
-                                        config_file)
+        cursor, db_conn, version = mysql_connect(module,
+                                                 login_user,
+                                                 login_password,
+                                                 config_file)
     except mysql_driver.Error as e:
         module.fail_json(
             msg="unable to connect to ProxySQL Admin Module.. %s" % to_native(e)

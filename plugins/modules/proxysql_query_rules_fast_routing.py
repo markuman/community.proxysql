@@ -14,6 +14,7 @@ short_description: Modifies query rules for fast routing policies using the prox
 description:
    - The M(community.proxysql.proxysql_query_rules_fast_routing) module modifies query rules for fast
      routing policies and attributes using the proxysql admin interface.
+version_added: '1.1.0'
 options:
   username:
     description:
@@ -59,11 +60,11 @@ options:
         schedules deleted, you can set I(force_delete) to C(True).
     type: bool
     default: False
-notes:
-- Supports C(check_mode).
 extends_documentation_fragment:
 - community.proxysql.proxysql.managing_config
 - community.proxysql.proxysql.connectivity
+notes:
+- Supports C(check_mode).
 '''
 
 EXAMPLES = '''
@@ -106,7 +107,7 @@ stdout:
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver, mysql_driver_fail_msg
+from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver
 from ansible.module_utils.six import iteritems
 from ansible.module_utils._text import to_native
 
@@ -118,9 +119,6 @@ from ansible.module_utils._text import to_native
 def perform_checks(module):
     if module.params["login_port"] < 0 or module.params["login_port"] > 65535:
         module.fail_json(msg="login_port must be a valid unix port number (0-65535)")
-
-    if mysql_driver is None:
-        module.fail_json(msg=mysql_driver_fail_msg)
 
 
 def save_config_to_disk(cursor):
@@ -376,7 +374,7 @@ def main():
 
     cursor = None
     try:
-        cursor, db_conn = mysql_connect(
+        cursor, db_conn, version = mysql_connect(
             module,
             login_user,
             login_password,

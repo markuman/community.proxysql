@@ -15,19 +15,23 @@ __metaclass__ = type
 import os
 
 from ansible.module_utils.six.moves import configparser
+from ansible.module_utils.basic import missing_required_lib
 
+MYSQL_IMP_ERR = None
 try:
     import pymysql as mysql_driver
     _mysql_cursor_param = 'cursor'
+    HAS_MYSQL_PACKAGE = True
 except ImportError:
     try:
         import MySQLdb as mysql_driver
         import MySQLdb.cursors
         _mysql_cursor_param = 'cursorclass'
+        HAS_MYSQL_PACKAGE = True
     except ImportError:
+        MYSQL_IMP_ERR = 'Cannot find PyMySQL or mysqlclient library.'
+        HAS_MYSQL_PACKAGE = False
         mysql_driver = None
-
-mysql_driver_fail_msg = 'The PyMySQL (Python 2.7 and Python 3.X) or MySQL-python (Python 2.X) module is required.'
 
 
 def parse_from_mysql_config_file(cnf):
@@ -36,10 +40,31 @@ def parse_from_mysql_config_file(cnf):
     return cp
 
 
+def _version(cursor):
+    cursor.execute("select version();")
+    res = cursor.fetchone()
+
+    # 2.2.0-72-ge14accd
+    raw_version = res.get('version()').split('-')
+    _version = raw_version[0].split('.')
+
+    version = dict()
+    version['full'] = res.get('version()')
+    version['major'] = int(_version[0])
+    version['minor'] = int(_version[1])
+    version['release'] = int(_version[2])
+    version['suffix'] = int(raw_version[1])
+
+    return version
+
+
 def mysql_connect(module, login_user=None, login_password=None, config_file='', ssl_cert=None,
                   ssl_key=None, ssl_ca=None, db=None, cursor_class=None,
                   connect_timeout=30, autocommit=False, config_overrides_defaults=False):
     config = {}
+
+    if not HAS_MYSQL_PACKAGE:
+        module.fail_json(msg=missing_required_lib("pymysql or MySQLdb"), exception=MYSQL_IMP_ERR)
 
     if config_file and os.path.exists(config_file):
         config['read_default_file'] = config_file
@@ -89,10 +114,16 @@ def mysql_connect(module, login_user=None, login_password=None, config_file='', 
         if autocommit:
             db_connection.autocommit(True)
 
+    version = _version(db_connection.cursor(**{_mysql_cursor_param: mysql_driver.cursors.DictCursor}))
+
     if cursor_class == 'DictCursor':
-        return db_connection.cursor(**{_mysql_cursor_param: mysql_driver.cursors.DictCursor}), db_connection
+        return (db_connection.cursor(**{_mysql_cursor_param: mysql_driver.cursors.DictCursor}),
+                db_connection,
+                version)
     else:
-        return db_connection.cursor(), db_connection
+        return (db_connection.cursor(),
+                db_connection,
+                version)
 
 
 def mysql_common_argument_spec():

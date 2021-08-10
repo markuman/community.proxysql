@@ -10,7 +10,7 @@ DOCUMENTATION = '''
 ---
 module: proxysql_scheduler
 author: "Ben Mildren (@bmildren)"
-short_description: Adds or removes schedules from proxysql admin interface.
+short_description: Adds or removes schedules from proxysql admin interface
 description:
    - The M(community.proxysql.proxysql_scheduler) module adds or removes schedules using the
      proxysql admin interface.
@@ -66,14 +66,15 @@ options:
   force_delete:
     description:
       - By default we avoid deleting more than one schedule in a single batch,
-        however if you need this behaviour and you're not concerned about the
+        however if you need this behaviour and you are not concerned about the
         schedules deleted, you can set I(force_delete) to C(True).
     type: bool
     default: False
 extends_documentation_fragment:
 - community.proxysql.proxysql.managing_config
 - community.proxysql.proxysql.connectivity
-
+notes:
+- Supports C(check_mode).
 '''
 
 EXAMPLES = '''
@@ -107,7 +108,7 @@ EXAMPLES = '''
 
 RETURN = '''
 stdout:
-    description: The schedule modified or removed from proxysql
+    description: The schedule modified or removed from proxysql.
     returned: On create/update will return the newly modified schedule, on
               delete it will return the deleted record.
     type: dict
@@ -134,7 +135,7 @@ stdout:
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver, mysql_driver_fail_msg
+from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver
 from ansible.module_utils.six import iteritems
 from ansible.module_utils._text import to_native
 
@@ -155,9 +156,6 @@ def perform_checks(module):
         module.fail_json(
             msg="interval_ms must between 100ms & 100000000ms"
         )
-
-    if mysql_driver is None:
-        module.fail_json(msg=mysql_driver_fail_msg)
 
 
 def save_config_to_disk(cursor):
@@ -361,11 +359,11 @@ def main():
 
     cursor = None
     try:
-        cursor, db_conn = mysql_connect(module,
-                                        login_user,
-                                        login_password,
-                                        config_file,
-                                        cursor_class='DictCursor')
+        cursor, db_conn, version = mysql_connect(module,
+                                                 login_user,
+                                                 login_password,
+                                                 config_file,
+                                                 cursor_class='DictCursor')
     except mysql_driver.Error as e:
         module.fail_json(
             msg="unable to connect to ProxySQL Admin Module.. %s" % to_native(e)

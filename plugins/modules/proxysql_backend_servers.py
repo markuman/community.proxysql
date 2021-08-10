@@ -10,7 +10,7 @@ DOCUMENTATION = '''
 ---
 module: proxysql_backend_servers
 author: "Ben Mildren (@bmildren)"
-short_description: Adds or removes mysql hosts from proxysql admin interface.
+short_description: Adds or removes mysql hosts from proxysql admin interface
 description:
    - The M(community.proxysql.proxysql_backend_servers) module adds or removes mysql hosts using
      the proxysql admin interface.
@@ -99,7 +99,8 @@ options:
 extends_documentation_fragment:
 - community.proxysql.proxysql.managing_config
 - community.proxysql.proxysql.connectivity
-
+notes:
+- Supports C(check_mode).
 '''
 
 EXAMPLES = '''
@@ -158,7 +159,7 @@ stdout:
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver, mysql_driver_fail_msg
+from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver
 from ansible.module_utils.six import iteritems
 from ansible.module_utils._text import to_native
 
@@ -193,9 +194,6 @@ def perform_checks(module):
             module.fail_json(
                 msg="max_replication_lag must be set between 0 and 102400"
             )
-
-    if mysql_driver is None:
-        module.fail_json(msg=mysql_driver_fail_msg)
 
 
 def save_config_to_disk(cursor):
@@ -457,11 +455,11 @@ def main():
 
     cursor = None
     try:
-        cursor, db_conn = mysql_connect(module,
-                                        login_user,
-                                        login_password,
-                                        config_file,
-                                        cursor_class='DictCursor')
+        cursor, db_conn, version = mysql_connect(module,
+                                                 login_user,
+                                                 login_password,
+                                                 config_file,
+                                                 cursor_class='DictCursor')
     except mysql_driver.Error as e:
         module.fail_json(
             msg="unable to connect to ProxySQL Admin Module.. %s" % to_native(e)

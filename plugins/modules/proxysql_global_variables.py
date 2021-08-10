@@ -10,7 +10,7 @@ DOCUMENTATION = '''
 ---
 module: proxysql_global_variables
 author: "Ben Mildren (@bmildren)"
-short_description: Gets or sets the proxysql global variables.
+short_description: Gets or sets the proxysql global variables
 description:
    - The M(community.proxysql.proxysql_global_variables) module gets or sets the proxysql global
      variables.
@@ -29,7 +29,8 @@ options:
 extends_documentation_fragment:
 - community.proxysql.proxysql.managing_config
 - community.proxysql.proxysql.connectivity
-
+notes:
+- Supports C(check_mode).
 '''
 
 EXAMPLES = '''
@@ -72,7 +73,7 @@ stdout:
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver, mysql_driver_fail_msg
+from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver
 from ansible.module_utils._text import to_native
 
 # ===========================================
@@ -86,9 +87,6 @@ def perform_checks(module):
         module.fail_json(
             msg="login_port must be a valid unix port number (0-65535)"
         )
-
-    if mysql_driver is None:
-        module.fail_json(msg=mysql_driver_fail_msg)
 
 
 def save_config_to_disk(variable, cursor):
@@ -200,11 +198,11 @@ def main():
 
     cursor = None
     try:
-        cursor, db_conn = mysql_connect(module,
-                                        login_user,
-                                        login_password,
-                                        config_file,
-                                        cursor_class='DictCursor')
+        cursor, db_conn, version = mysql_connect(module,
+                                                 login_user,
+                                                 login_password,
+                                                 config_file,
+                                                 cursor_class='DictCursor')
     except mysql_driver.Error as e:
         module.fail_json(
             msg="unable to connect to ProxySQL Admin Module.. %s" % to_native(e)

@@ -10,7 +10,7 @@ DOCUMENTATION = '''
 ---
 module: proxysql_query_rules
 author: "Ben Mildren (@bmildren)"
-short_description: Modifies query rules using the proxysql admin interface.
+short_description: Modifies query rules using the proxysql admin interface
 description:
    - The M(community.proxysql.proxysql_query_rules) module modifies query rules using the
      proxysql admin interface.
@@ -61,12 +61,12 @@ options:
   match_digest:
     description:
       - Regular expression that matches the query digest. The dialect of
-        regular expressions used is that of re2 - https://github.com/google/re2
+        regular expressions used is that of re2 - U(https://github.com/google/re2).
     type: str
   match_pattern:
     description:
       - Regular expression that matches the query text. The dialect of regular
-        expressions used is that of re2 - https://github.com/google/re2
+        expressions used is that of re2 - U(https://github.com/google/re2).
     type: str
   negate_match_pattern:
     description:
@@ -176,14 +176,15 @@ options:
   force_delete:
     description:
       - By default we avoid deleting more than one schedule in a single batch,
-        however if you need this behaviour and you're not concerned about the
+        however if you need this behaviour and you are not concerned about the
         schedules deleted, you can set I(force_delete) to C(True).
     type: bool
     default: False
 extends_documentation_fragment:
 - community.proxysql.proxysql.managing_config
 - community.proxysql.proxysql.connectivity
-
+notes:
+- Supports C(check_mode).
 '''
 
 EXAMPLES = '''
@@ -265,7 +266,7 @@ EXAMPLES = '''
 
 RETURN = '''
 stdout:
-    description: The mysql user modified or removed from proxysql
+    description: The mysql user modified or removed from proxysql.
     returned: On create/update will return the newly modified rule, in all
               other cases will return a list of rules that match the supplied
               criteria.
@@ -311,7 +312,7 @@ stdout:
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver, mysql_driver_fail_msg
+from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver
 from ansible.module_utils.six import iteritems
 from ansible.module_utils._text import to_native
 
@@ -326,9 +327,6 @@ def perform_checks(module):
         module.fail_json(
             msg="login_port must be a valid unix port number (0-65535)"
         )
-
-    if mysql_driver is None:
-        module.fail_json(msg=mysql_driver_fail_msg)
 
 
 def save_config_to_disk(cursor):
@@ -634,11 +632,11 @@ def main():
 
     cursor = None
     try:
-        cursor, db_conn = mysql_connect(module,
-                                        login_user,
-                                        login_password,
-                                        config_file,
-                                        cursor_class='DictCursor')
+        cursor, db_conn, version = mysql_connect(module,
+                                                 login_user,
+                                                 login_password,
+                                                 config_file,
+                                                 cursor_class='DictCursor')
     except mysql_driver.Error as e:
         module.fail_json(
             msg="unable to connect to ProxySQL Admin Module.. %s" % to_native(e)

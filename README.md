@@ -19,7 +19,11 @@ All types of contributions are very welcome.
 
 You don't know how to start? Refer to our [contribution guide](https://github.com/ansible-collections/community.proxysql/blob/main/CONTRIBUTING.md)!
 
-The current maintainers (contributors with `write` or higher access) are listed in the [MAINTAINERS](https://github.com/ansible-collections/community.proxysql/blob/main/MAINTAINERS) file. If you have questions or need help, feel free to mention them in the proposals. To learn how to maintain / become a maintainer of this collection, refer to the [Maintainer guidelines](https://github.com/ansible/community-docs/blob/main/maintaining.rst).
+## Collection maintenance
+
+The current maintainers (contributors with `write` or higher access) are listed in the [MAINTAINERS](https://github.com/ansible-collections/community.proxysql/blob/main/MAINTAINERS) file. If you have questions or need help, feel free to mention them in the proposals.
+
+To learn how to maintain / become a maintainer of this collection, refer to the [Maintainer guidelines](https://github.com/ansible-collections/community.proxysql/blob/main/MAINTAINING.md).
 
 ## Communication
 
@@ -36,6 +40,7 @@ For more information about communication, refer to the [Ansible Communication gu
 - **Modules**:
   - [proxysql_backend_servers](https://docs.ansible.com/ansible/latest/modules/proxysql_backend_servers_module.html)
   - [proxysql_global_variables](https://docs.ansible.com/ansible/latest/modules/proxysql_global_variables_module.html)
+  - [proxysql_info](https://docs.ansible.com/ansible/latest/modules/proxysql_info_module.html)
   - [proxysql_manage_config](https://docs.ansible.com/ansible/latest/modules/proxysql_manage_config_module.html)
   - [proxysql_mysql_users](https://docs.ansible.com/ansible/latest/modules/proxysql_mysql_users_module.html)
   - [proxysql_query_rules](https://docs.ansible.com/ansible/latest/modules/proxysql_query_rules_module.html)
