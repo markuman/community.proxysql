@@ -12,7 +12,7 @@
         start proxysql container for integration tests
       community.docker.docker_container:
         name: proxysql
-        image: "proxysql/proxysql:{{ PROXYSQL_VERSION | default('2.2.0') }}"
+        image: "proxysql/proxysql:{{ PROXYSQL_VERSION | default('2.1.1') }}"
         state: started
         auto_remove: yes
         recreate: yes
@@ -70,6 +70,7 @@
       include_role:
         name: "{{ item }}"
       with_items:
+        - test_proxysql_info
         - test_proxysql_backend_servers
         - test_proxysql_global_variables
         - test_proxysql_mysql_users
