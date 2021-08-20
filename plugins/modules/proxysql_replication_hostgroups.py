@@ -33,6 +33,7 @@ options:
     description:
       - Text field that can be used for any purposes defined by the user.
     type: str
+    default: ""
   state:
     description:
       - When C(present) - adds the replication hostgroup, when C(absent) -
@@ -40,6 +41,14 @@ options:
     type: str
     choices: [ "present", "absent" ]
     default: present
+  check_type:
+    description:
+      - Which check type to use when detecting that the node is a standby.
+      - Requires proxysql >= 2.0.1. Otherwise it has no effect.
+      - C(read_only|innodb_read_only) and C(read_only&innodb_read_only) requires proxysql >= 2.0.8.
+    type: str
+    choices: [ "read_only", "innodb_read_only", "super_read_only", "read_only|innodb_read_only", "read_only&innodb_read_only" ]
+    default: read_only
 extends_documentation_fragment:
 - community.proxysql.proxysql.managing_config
 - community.proxysql.proxysql.connectivity
@@ -90,14 +99,19 @@ stdout:
         "repl_group": {
             "comment": "",
             "reader_hostgroup": "1",
-            "writer_hostgroup": "2"
+            "writer_hostgroup": "2",
+            "check_type": "read_only"
         },
         "state": "present"
     }
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.community.proxysql.plugins.module_utils.mysql import mysql_connect, mysql_driver
+from ansible_collections.community.proxysql.plugins.module_utils.mysql import (
+    mysql_connect,
+    mysql_driver,
+    proxysql_common_argument_spec
+)
 from ansible.module_utils._text import to_native
 
 # ===========================================
@@ -106,28 +120,19 @@ from ansible.module_utils._text import to_native
 
 
 def perform_checks(module):
-    if module.params["login_port"] < 0 \
-       or module.params["login_port"] > 65535:
-        module.fail_json(
-            msg="login_port must be a valid unix port number (0-65535)"
-        )
-
     if not module.params["writer_hostgroup"] >= 0:
         module.fail_json(
             msg="writer_hostgroup must be a integer greater than or equal to 0"
         )
 
-    if not module.params["reader_hostgroup"] == \
-            module.params["writer_hostgroup"]:
-        if not module.params["reader_hostgroup"] > 0:
-            module.fail_json(
-                msg=("writer_hostgroup must be a integer greater than" +
-                     " or equal to 0")
-            )
-    else:
+    if not module.params["reader_hostgroup"] >= 0:
         module.fail_json(
-            msg="reader_hostgroup cannot equal writer_hostgroup"
+            msg="reader_hostgroup must be a integer greater than or equal to 0"
         )
+
+    if module.params["reader_hostgroup"] == module.params["writer_hostgroup"]:
+        module.fail_json(
+            msg="reader_hostgroup and writer_hostgroup must be different integer values")
 
 
 def save_config_to_disk(cursor):
@@ -142,28 +147,25 @@ def load_config_to_runtime(cursor):
 
 class ProxySQLReplicationHostgroup(object):
 
-    def __init__(self, module):
+    def __init__(self, module, version):
         self.state = module.params["state"]
         self.save_to_disk = module.params["save_to_disk"]
         self.load_to_runtime = module.params["load_to_runtime"]
         self.writer_hostgroup = module.params["writer_hostgroup"]
         self.reader_hostgroup = module.params["reader_hostgroup"]
         self.comment = module.params["comment"]
+        self.check_type = module.params["check_type"]
+        self.check_type_support = version.get('major') >= 2 and version.get('release') >= 1
+        self.check_mode = module.check_mode
 
     def check_repl_group_config(self, cursor, keys):
         query_string = \
             """SELECT count(*) AS `repl_groups`
                FROM mysql_replication_hostgroups
-               WHERE writer_hostgroup = %s
-                 AND reader_hostgroup = %s"""
+               WHERE writer_hostgroup = %s"""
 
         query_data = \
-            [self.writer_hostgroup,
-             self.reader_hostgroup]
-
-        if self.comment and not keys:
-            query_string += "\n  AND comment = %s"
-            query_data.append(self.comment)
+            [self.writer_hostgroup]
 
         cursor.execute(query_string, query_data)
         check_count = cursor.fetchone()
@@ -173,12 +175,10 @@ class ProxySQLReplicationHostgroup(object):
         query_string = \
             """SELECT *
                FROM mysql_replication_hostgroups
-               WHERE writer_hostgroup = %s
-                 AND reader_hostgroup = %s"""
+               WHERE writer_hostgroup = %s"""
 
         query_data = \
-            [self.writer_hostgroup,
-             self.reader_hostgroup]
+            [self.writer_hostgroup]
 
         cursor.execute(query_string, query_data)
         repl_group = cursor.fetchone()
@@ -198,45 +198,32 @@ class ProxySQLReplicationHostgroup(object):
              self.comment or '']
 
         cursor.execute(query_string, query_data)
-        return True
 
-    def update_repl_group_config(self, cursor):
-        query_string = \
-            """UPDATE mysql_replication_hostgroups
-               SET comment = %s
-               WHERE writer_hostgroup = %s
-                 AND reader_hostgroup = %s"""
+        if self.check_type_support:
+            self.update_check_type(cursor)
 
-        query_data = \
-            [self.comment,
-             self.writer_hostgroup,
-             self.reader_hostgroup]
-
-        cursor.execute(query_string, query_data)
         return True
 
     def delete_repl_group_config(self, cursor):
         query_string = \
             """DELETE FROM mysql_replication_hostgroups
-               WHERE writer_hostgroup = %s
-                 AND reader_hostgroup = %s"""
+               WHERE writer_hostgroup = %s"""
 
         query_data = \
-            [self.writer_hostgroup,
-             self.reader_hostgroup]
+            [self.writer_hostgroup]
 
         cursor.execute(query_string, query_data)
         return True
 
     def manage_config(self, cursor, state):
-        if state:
+        if state and not self.check_mode:
             if self.save_to_disk:
                 save_config_to_disk(cursor)
             if self.load_to_runtime:
                 load_config_to_runtime(cursor)
 
-    def create_repl_group(self, check_mode, result, cursor):
-        if not check_mode:
+    def create_repl_group(self, result, cursor):
+        if not self.check_mode:
             result['changed'] = \
                 self.create_repl_group_config(cursor)
             result['msg'] = "Added server to mysql_hosts"
@@ -250,23 +237,38 @@ class ProxySQLReplicationHostgroup(object):
                              " mysql_replication_hostgroups, however" +
                              " check_mode is enabled.")
 
-    def update_repl_group(self, check_mode, result, cursor):
-        if not check_mode:
-            result['changed'] = \
-                self.update_repl_group_config(cursor)
-            result['msg'] = "Updated server in mysql_hosts"
-            result['repl_group'] = \
-                self.get_repl_group_config(cursor)
-            self.manage_config(cursor,
-                               result['changed'])
-        else:
-            result['changed'] = True
-            result['msg'] = ("Repl group would have been updated in" +
-                             " mysql_replication_hostgroups, however" +
-                             " check_mode is enabled.")
+    def update_repl_group(self, result, cursor):
+        current = self.get_repl_group_config(cursor)
 
-    def delete_repl_group(self, check_mode, result, cursor):
-        if not check_mode:
+        if current.get('check_type') != self.check_type:
+            result['changed'] = True
+            result['msg'] = "Updated replication hostgroups in check_mode"
+            if not self.check_mode:
+                result['msg'] = "Updated replication hostgroups"
+                self.update_check_type(cursor)
+
+        if current.get('comment') != self.comment:
+            result['changed'] = True
+            result['msg'] = "Updated replication hostgroups in check_mode"
+            if not self.check_mode:
+                result['msg'] = "Updated replication hostgroups"
+                self.update_comment(cursor)
+
+        if int(current.get('reader_hostgroup')) != self.reader_hostgroup:
+            result['changed'] = True
+            result['msg'] = "Updated replication hostgroups in check_mode"
+            if not self.check_mode:
+                result['msg'] = "Updated replication hostgroups"
+                self.update_reader_hostgroup(cursor)
+
+        result['repl_group'] = \
+            self.get_repl_group_config(cursor)
+
+        self.manage_config(cursor,
+                           result['changed'])
+
+    def delete_repl_group(self, result, cursor):
+        if not self.check_mode:
             result['repl_group'] = \
                 self.get_repl_group_config(cursor)
             result['changed'] = \
@@ -280,29 +282,69 @@ class ProxySQLReplicationHostgroup(object):
                              " mysql_replication_hostgroups, however" +
                              " check_mode is enabled.")
 
+    def update_check_type(self, cursor):
+        try:
+            query_string = \
+                """UPDATE mysql_replication_hostgroups
+                    SET check_type = %s
+                    WHERE writer_hostgroup = %s
+                """
+
+            query_data = \
+                [self.check_type, self.writer_hostgroup]
+
+            cursor.execute(query_string, query_data)
+        except Exception as e:
+            pass
+
+    def update_reader_hostgroup(self, cursor):
+        query_string = \
+            """UPDATE mysql_replication_hostgroups
+                SET reader_hostgroup = %s
+                WHERE writer_hostgroup = %s
+            """
+
+        query_data = \
+            [self.reader_hostgroup, self.writer_hostgroup]
+
+        cursor.execute(query_string, query_data)
+
+    def update_comment(self, cursor):
+        query_string = \
+            """UPDATE mysql_replication_hostgroups
+                SET comment = %s
+                WHERE writer_hostgroup = %s
+            """
+
+        query_data = \
+            [self.comment, self.writer_hostgroup]
+
+        cursor.execute(query_string, query_data)
+
+
 # ===========================================
 # Module execution.
 #
-
-
 def main():
+    argument_spec = proxysql_common_argument_spec()
+    argument_spec.update(
+        writer_hostgroup=dict(required=True, type='int'),
+        reader_hostgroup=dict(required=True, type='int'),
+        check_type=dict(type='str', default='read_only', choices=["read_only",
+                                                                  "innodb_read_only",
+                                                                  "super_read_only",
+                                                                  "read_only|innodb_read_only",
+                                                                  "read_only&innodb_read_only"]),
+        comment=dict(type='str', default=''),
+        state=dict(default='present', choices=['present',
+                                               'absent']),
+        save_to_disk=dict(default=True, type='bool'),
+        load_to_runtime=dict(default=True, type='bool')
+    )
+
     module = AnsibleModule(
-        argument_spec=dict(
-            login_user=dict(default=None, type='str'),
-            login_password=dict(default=None, no_log=True, type='str'),
-            login_host=dict(default="127.0.0.1"),
-            login_unix_socket=dict(default=None),
-            login_port=dict(default=6032, type='int'),
-            config_file=dict(default="", type='path'),
-            writer_hostgroup=dict(required=True, type='int'),
-            reader_hostgroup=dict(required=True, type='int'),
-            comment=dict(type='str'),
-            state=dict(default='present', choices=['present',
-                                                   'absent']),
-            save_to_disk=dict(default=True, type='bool'),
-            load_to_runtime=dict(default=True, type='bool')
-        ),
-        supports_check_mode=True
+        supports_check_mode=True,
+        argument_spec=argument_spec
     )
 
     perform_checks(module)
@@ -323,31 +365,24 @@ def main():
             msg="unable to connect to ProxySQL Admin Module.. %s" % to_native(e)
         )
 
-    proxysql_repl_group = ProxySQLReplicationHostgroup(module)
+    proxysql_repl_group = ProxySQLReplicationHostgroup(module, version)
     result = {}
 
     result['state'] = proxysql_repl_group.state
+    result['changed'] = False
 
     if proxysql_repl_group.state == "present":
         try:
             if not proxysql_repl_group.check_repl_group_config(cursor,
                                                                keys=True):
-                proxysql_repl_group.create_repl_group(module.check_mode,
-                                                      result,
+                proxysql_repl_group.create_repl_group(result,
                                                       cursor)
             else:
-                if not proxysql_repl_group.check_repl_group_config(cursor,
-                                                                   keys=False):
-                    proxysql_repl_group.update_repl_group(module.check_mode,
-                                                          result,
-                                                          cursor)
-                else:
-                    result['changed'] = False
-                    result['msg'] = ("The repl group already exists in" +
-                                     " mysql_replication_hostgroups and" +
-                                     " doesn't need to be updated.")
-                    result['repl_group'] = \
-                        proxysql_repl_group.get_repl_group_config(cursor)
+                proxysql_repl_group.update_repl_group(result,
+                                                      cursor)
+
+                result['repl_group'] = \
+                    proxysql_repl_group.get_repl_group_config(cursor)
 
         except mysql_driver.Error as e:
             module.fail_json(
@@ -358,8 +393,7 @@ def main():
         try:
             if proxysql_repl_group.check_repl_group_config(cursor,
                                                            keys=True):
-                proxysql_repl_group.delete_repl_group(module.check_mode,
-                                                      result,
+                proxysql_repl_group.delete_repl_group(result,
                                                       cursor)
             else:
                 result['changed'] = False

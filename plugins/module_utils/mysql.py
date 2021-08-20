@@ -66,6 +66,12 @@ def mysql_connect(module, login_user=None, login_password=None, config_file='', 
     if not HAS_MYSQL_PACKAGE:
         module.fail_json(msg=missing_required_lib("pymysql or MySQLdb"), exception=MYSQL_IMP_ERR)
 
+    if module.params["login_port"] < 0 \
+       or module.params["login_port"] > 65535:
+        module.fail_json(
+            msg="login_port must be a valid unix port number (0-65535)"
+        )
+
     if config_file and os.path.exists(config_file):
         config['read_default_file'] = config_file
         cp = parse_from_mysql_config_file(config_file)
@@ -126,16 +132,12 @@ def mysql_connect(module, login_user=None, login_password=None, config_file='', 
                 version)
 
 
-def mysql_common_argument_spec():
+def proxysql_common_argument_spec():
     return dict(
         login_user=dict(type='str', default=None),
         login_password=dict(type='str', no_log=True),
-        login_host=dict(type='str', default='localhost'),
-        login_port=dict(type='int', default=3306),
+        login_host=dict(type='str', default='127.0.0.1'),
+        login_port=dict(type='int', default=6032),
         login_unix_socket=dict(type='str'),
-        config_file=dict(type='path', default='~/.my.cnf'),
-        connect_timeout=dict(type='int', default=30),
-        client_cert=dict(type='path', aliases=['ssl_cert']),
-        client_key=dict(type='path', aliases=['ssl_key']),
-        ca_cert=dict(type='path', aliases=['ssl_ca']),
+        config_file=dict(type='path', default=''),
     )
