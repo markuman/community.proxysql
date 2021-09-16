@@ -49,6 +49,7 @@ options:
     type: str
     choices: [ "read_only", "innodb_read_only", "super_read_only", "read_only|innodb_read_only", "read_only&innodb_read_only" ]
     default: read_only
+    version_added: 1.3.0
 extends_documentation_fragment:
 - community.proxysql.proxysql.managing_config
 - community.proxysql.proxysql.connectivity
@@ -71,6 +72,16 @@ EXAMPLES = '''
     login_password: 'admin'
     writer_hostgroup: 1
     reader_hostgroup: 2
+    state: present
+    load_to_runtime: False
+
+- name: Change check_type
+  community.proxysql.proxysql_replication_hostgroups:
+    login_user: 'admin'
+    login_password: 'admin'
+    writer_hostgroup: 1
+    reader_hostgroup: 2
+    check_type: innodb_read_only
     state: present
     load_to_runtime: False
 
@@ -125,9 +136,9 @@ def perform_checks(module):
             msg="writer_hostgroup must be a integer greater than or equal to 0"
         )
 
-    if not module.params["reader_hostgroup"] >= 0:
+    if module.params["reader_hostgroup"] < 0:
         module.fail_json(
-            msg="reader_hostgroup must be a integer greater than or equal to 0"
+            msg="reader_hostgroup must be an integer greater than or equal to 0"
         )
 
     if module.params["reader_hostgroup"] == module.params["writer_hostgroup"]:
@@ -261,8 +272,7 @@ class ProxySQLReplicationHostgroup(object):
                 result['msg'] = "Updated replication hostgroups"
                 self.update_reader_hostgroup(cursor)
 
-        result['repl_group'] = \
-            self.get_repl_group_config(cursor)
+        result['repl_group'] = self.get_repl_group_config(cursor)
 
         self.manage_config(cursor,
                            result['changed'])
@@ -284,42 +294,27 @@ class ProxySQLReplicationHostgroup(object):
 
     def update_check_type(self, cursor):
         try:
-            query_string = \
-                """UPDATE mysql_replication_hostgroups
-                    SET check_type = %s
-                    WHERE writer_hostgroup = %s
-                """
+            query_string = ("UPDATE mysql_replication_hostgroups "
+                            "SET check_type = %s "
+                            "WHERE writer_hostgroup = %s")
 
-            query_data = \
-                [self.check_type, self.writer_hostgroup]
-
-            cursor.execute(query_string, query_data)
+            cursor.execute(query_string, (self.check_type, self.writer_hostgroup))
         except Exception as e:
             pass
 
     def update_reader_hostgroup(self, cursor):
-        query_string = \
-            """UPDATE mysql_replication_hostgroups
-                SET reader_hostgroup = %s
-                WHERE writer_hostgroup = %s
-            """
+        query_string = ("UPDATE mysql_replication_hostgroups "
+                        "SET reader_hostgroup = %s "
+                        "WHERE writer_hostgroup = %s")
 
-        query_data = \
-            [self.reader_hostgroup, self.writer_hostgroup]
-
-        cursor.execute(query_string, query_data)
+        cursor.execute(query_string, (self.reader_hostgroup, self.writer_hostgroup))
 
     def update_comment(self, cursor):
-        query_string = \
-            """UPDATE mysql_replication_hostgroups
-                SET comment = %s
-                WHERE writer_hostgroup = %s
-            """
+        query_string = ("UPDATE mysql_replication_hostgroups "
+                        "SET comment = %s "
+                        "WHERE writer_hostgroup = %s ")
 
-        query_data = \
-            [self.comment, self.writer_hostgroup]
-
-        cursor.execute(query_string, query_data)
+        cursor.execute(query_string, (self.comment, self.writer_hostgroup))
 
 
 # ===========================================
@@ -330,11 +325,11 @@ def main():
     argument_spec.update(
         writer_hostgroup=dict(required=True, type='int'),
         reader_hostgroup=dict(required=True, type='int'),
-        check_type=dict(type='str', default='read_only', choices=["read_only",
-                                                                  "innodb_read_only",
-                                                                  "super_read_only",
-                                                                  "read_only|innodb_read_only",
-                                                                  "read_only&innodb_read_only"]),
+        check_type=dict(type='str', default='read_only', choices=['read_only',
+                                                                  'innodb_read_only',
+                                                                  'super_read_only',
+                                                                  'read_only|innodb_read_only',
+                                                                  'read_only&innodb_read_only']),
         comment=dict(type='str', default=''),
         state=dict(default='present', choices=['present',
                                                'absent']),
@@ -378,11 +373,9 @@ def main():
                 proxysql_repl_group.create_repl_group(result,
                                                       cursor)
             else:
-                proxysql_repl_group.update_repl_group(result,
-                                                      cursor)
+                proxysql_repl_group.update_repl_group(result, cursor)
 
-                result['repl_group'] = \
-                    proxysql_repl_group.get_repl_group_config(cursor)
+                result['repl_group'] = proxysql_repl_group.get_repl_group_config(cursor)
 
         except mysql_driver.Error as e:
             module.fail_json(
@@ -393,8 +386,7 @@ def main():
         try:
             if proxysql_repl_group.check_repl_group_config(cursor,
                                                            keys=True):
-                proxysql_repl_group.delete_repl_group(result,
-                                                      cursor)
+                proxysql_repl_group.delete_repl_group(result, cursor)
             else:
                 result['changed'] = False
                 result['msg'] = ("The repl group is already absent from the" +
