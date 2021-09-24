@@ -265,34 +265,34 @@ EXAMPLES = '''
     multiplex: 2
 
 # This example demonstrates how to use next_query_flagIN argument. It allows
-# ProxySQL query rules to be chained. The examples shows how you can have SELECTS 
+# ProxySQL query rules to be chained. The examples shows how you can have SELECTS
 # immediately follow INSERT/UPDATE/DELETE statements to query the primary hostgroup
 # and avoid replication lag
 
 - name: Add insert query rule
-   proxysql_query_rules:
-      match_digest: "^INSERT"
-      destination_hostgroup: 1,
-      next_query_flagIN: 1
+  proxysql_query_rules:
+    match_digest: "^INSERT"
+    destination_hostgroup: 1,
+    next_query_flagIN: 1
 
 - name: Add update query rule
-   proxysql_query_rules:
-      match_digest: "^UPDATE"
-      destination_hostgroup: 1,
-      next_query_flagIN: 1
+  proxysql_query_rules:
+    match_digest: "^UPDATE"
+    destination_hostgroup: 1,
+    next_query_flagIN: 1
 
 - name: Add delete query rules
-   proxysql_query_rules:
-      match_digest: "^DELETE"
-      destination_hostgroup: 1,
-      next_query_flagIN: 1
+  proxysql_query_rules:
+    match_digest: "^DELETE"
+    destination_hostgroup: 1,
+    next_query_flagIN: 1
 
 - name: Add insert query rules
-   proxysql_query_rules:
-      match_digest: ".*"
-      destination_hostgroup: 1,
-      next_query_flagIN: 1
-      comment: Match every queries after an INSERT/UPDATE/DELETE query
+  proxysql_query_rules:
+    match_digest: ".*"
+    destination_hostgroup: 1,
+    next_query_flagIN: 1
+    comment: Match every queries after an INSERT/UPDATE/DELETE query
 
 # This example removes all rules that use the username 'guest_ro', saves the
 # mysql query rule config to disk, and dynamically loads the mysql query rule
