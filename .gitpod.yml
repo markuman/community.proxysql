@@ -1,5 +1,6 @@
 tasks:
-  - init: sudo pip3 install ansible docker
+  - before: sudo pip3 install ansible docker
+    init: ansible-galaxy collection build && ansible-galaxy collection install community.*
 # Ports to expose on workspace startup
 ports:
   - port: 6080
