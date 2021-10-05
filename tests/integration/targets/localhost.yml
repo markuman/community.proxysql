@@ -12,7 +12,7 @@
         start proxysql container for integration tests
       community.docker.docker_container:
         name: proxysql
-        image: "proxysql/proxysql:{{ PROXYSQL_VERSION | default('2.1.1') }}"
+        image: "proxysql/proxysql:{{ PROXYSQL_VERSION | default('2.3.0') }}"
         state: started
         auto_remove: yes
         recreate: yes
@@ -43,7 +43,7 @@
         name:
           - python3-pymysql
           - python3-apt
-          - mysql-client
+          - mariadb-client
         state: present
         update_cache: yes
 
@@ -54,7 +54,7 @@
           apt:
             name:
               - python3-apt
-              - mysql-client
+              - mariadb-client
               - python3-dev
               - default-libmysqlclient-dev
               - build-essential
